@@ -125,6 +125,7 @@
   .kbtn.on[data-k="有給（全休）"]   { background: var(--amber); border-color: var(--amber); }
   .kbtn.on[data-k="有給（午前休）"] { background: var(--amber); border-color: var(--amber); }
   .kbtn.on[data-k="有給（午後休）"] { background: var(--amber); border-color: var(--amber); }
+  .kbtn.on[data-k="休日出勤"]     { background: var(--red);   border-color: var(--red); }
 
   /* ===== 時間入力 ===== */
   .times { display: none; margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
@@ -252,8 +253,8 @@
 // 設定
 // ============================================================
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxZiF5RJhBjz5pmJ27nFSzGnD0-7vyjuaGbxOMUI0tdssu3v6fHzDOPwn0UezRu90qwQw/exec';
-const KUBUNS = ['出勤', '欠勤', '公休', '有給（全休）', '有給（午前休）', '有給（午後休）'];
-const TIME_KUBUNS = ['出勤', '有給（午前休）', '有給（午後休）'];  // 時間欄を表示する区分
+const KUBUNS = ['出勤', '欠勤', '公休', '有給（全休）', '有給（午前休）', '有給（午後休）', '休日出勤'];
+const TIME_KUBUNS = ['出勤', '有給（午前休）', '有給（午後休）', '休日出勤'];  // 時間欄を表示する区分
 const TIME_FIELDS = [
   { key: 'chikoku', label: '遅刻' },
   { key: 'sotai',   label: '早退' },
@@ -364,7 +365,7 @@ function render() {
     });
     card.appendChild(kd);
 
-    // 時間欄（出勤・半休のみ表示）
+    // 時間欄（出勤・半休・休日出勤のみ表示）
     const tw = document.createElement('div');
     tw.className = 'times' + (TIME_KUBUNS.includes(en.kubun) ? ' show' : '');
     TIME_FIELDS.forEach(f => {
