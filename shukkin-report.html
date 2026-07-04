@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出退勤表 | 株式会社イケモト</title>
+<style>
+  :root {
+    --ink: #1a2233;
+    --ink-soft: #4a5568;
+    --line: #d4d9e2;
+    --line-soft: #e8ebf0;
+    --paper: #ffffff;
+    --bg: #eef1f5;
+    --accent: #2d5a7c;
+    --accent-soft: #eaf2f8;
+    --holiday: #b5453a;
+    --holiday-soft: #fbeceb;
+    --sat: #2d5a7c;
+    --sun: #b5453a;
+    --zebra: #f7f9fb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    padding: 20px;
+  }
+
+  /* ---- 操作パネル（印刷時は非表示） ---- */
+  .controls {
+    max-width: 760px;
+    margin: 0 auto 24px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 20px;
+    align-items: flex-end;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+  .field input, .field select {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    min-width: 160px;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .btn {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { background: #a8b3c1; cursor: not-allowed; }
+  .btn-ghost {
+    background: #fff;
+    color: var(--accent);
+    border: 1px solid var(--line);
+  }
+  .btn-ghost:hover { background: var(--accent-soft); }
+
+  .status {
+    max-width: 760px;
+    margin: 0 auto 20px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    text-align: center;
+    min-height: 20px;
+  }
+  .status.error { color: var(--holiday); font-weight: 600; }
+
+  /* ---- 帳票本体 ---- */
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 36px 40px 44px;
+    box-shadow: 0 1px 3px rgba(26,34,51,0.06);
+  }
+  .sheet.hidden { display: none; }
+
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+  }
+  .sheet-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+  .sheet-company {
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.7;
+  }
+  .sheet-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 16px 0 20px;
+    font-size: 14px;
+  }
+  .sheet-meta .name {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .sheet-meta .name small {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin-right: 6px;
+  }
+  .sheet-meta .period { color: var(--ink-soft); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead th {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: 8px 6px;
+    border: 1px solid var(--accent);
+    letter-spacing: 0.04em;
+  }
+  tbody td {
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    text-align: center;
+  }
+  tbody tr:nth-child(even) { background: var(--zebra); }
+  td.date { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.wd { width: 40px; }
+  td.wd.sat { color: var(--sat); font-weight: 600; }
+  td.wd.sun { color: var(--sun); font-weight: 600; }
+  td.kubun { font-weight: 500; }
+  td.zangyo { font-variant-numeric: tabular-nums; }
+  tr.is-holiday { background: var(--holiday-soft) !important; }
+  tr.is-holiday td.kubun { color: var(--holiday); font-weight: 700; }
+
+  tfoot td {
+    padding: 10px 8px;
+    border: 1px solid var(--ink);
+    font-weight: 700;
+    background: var(--accent-soft);
+  }
+  tfoot .label { text-align: right; letter-spacing: 0.06em; }
+  tfoot .val { font-variant-numeric: tabular-nums; font-size: 15px; }
+
+  .summary-cards {
+    display: flex;
+    gap: 14px;
+    margin-top: 22px;
+  }
+  .card {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .card .k { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.04em; }
+  .card .v {
+    font-size: 26px;
+    font-weight: 700;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .card .v small { font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+
+  .sheet-foot {
+    margin-top: 28px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 40px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .sign { text-align: center; }
+  .sign .box {
+    width: 90px; height: 52px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  /* ---- 印刷 ---- */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .controls, .status, .no-print { display: none !important; }
+    .sheet {
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 0;
+      margin: 0;
+    }
+    thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr:nth-child(even),
+    tr.is-holiday, tfoot td, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { size: A4 portrait; margin: 14mm; }
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 12px; }
+    .sheet { padding: 22px 16px 28px; }
+    .field input, .field select { min-width: 0; width: 100%; }
+    .field { flex: 1 1 100%; }
+    .summary-cards { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls no-print">
+  <div class="field">
+    <label for="pay">支払月</label>
+    <input type="month" id="pay">
+  </div>
+  <div class="field">
+    <label for="emp">社員</label>
+    <select id="emp"><option value="">読み込み中…</option></select>
+  </div>
+  <button class="btn btn-primary" id="gen">表示する</button>
+  <button class="btn btn-ghost" id="print" disabled>印刷</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<div class="sheet hidden" id="sheet">
+  <div class="sheet-head">
+    <div class="sheet-title">出退勤表</div>
+    <div class="sheet-company">
+      株式会社イケモト<br>
+      <span id="payLabel"></span>
+    </div>
+  </div>
+  <div class="sheet-meta">
+    <div class="name"><small>氏名</small><span id="empName"></span></div>
+    <div class="period" id="period"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:22%">日付</th>
+        <th style="width:12%">曜日</th>
+        <th style="width:42%">区分</th>
+        <th style="width:24%">残業(h)</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+    <tfoot>
+      <tr>
+        <td class="label" colspan="3">残業時間 合計</td>
+        <td class="val" id="ftZangyo">0</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="summary-cards">
+    <div class="card">
+      <div class="k">出勤日数</div>
+      <div class="v"><span id="cSyukkin">0</span><small> 日</small></div>
+    </div>
+    <div class="card">
+      <div class="k">休日出勤日数</div>
+      <div class="v"><span id="cKyujitsu">0</span><small> 日</small></div>
+    </div>
+    <div class="card">
+      <div class="k">残業時間</div>
+      <div class="v"><span id="cZangyo">0</span><small> h</small></div>
+    </div>
+  </div>
+
+  <div class="sheet-foot">
+    <div class="sign">承認<div class="box"></div></div>
+    <div class="sign">本人確認<div class="box"></div></div>
+  </div>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxZiF5RJhBjz5pmJ27nFSzGnD0-7vyjuaGbxOMUI0tdssu3v6fHzDOPwn0UezRu90qwQw/exec";
+
+const $ = function(id) { return document.getElementById(id); };
+
+// 初期化：社員一覧を読み込み、支払月を当月にセット
+window.addEventListener('DOMContentLoaded', function() {
+  const now = new Date();
+  $('pay').value = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+  loadEmployees();
+  $('gen').addEventListener('click', generate);
+  $('print').addEventListener('click', function() { window.print(); });
+});
+
+function setStatus(msg, isError) {
+  const el = $('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (isError ? ' error' : '');
+}
+
+function loadEmployees() {
+  setStatus('社員一覧を読み込んでいます…');
+  fetch(GAS_URL)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status !== 'ok') throw new Error(d.message || '取得に失敗しました');
+      const sel = $('emp');
+      sel.innerHTML = '<option value="">選択してください</option>';
+      d.employees.forEach(function(e) {
+        const o = document.createElement('option');
+        o.value = e.name; o.textContent = e.name;
+        sel.appendChild(o);
+      });
+      setStatus('');
+    })
+    .catch(function(err) {
+      setStatus('社員一覧を読み込めませんでした：' + err.message, true);
+    });
+}
+
+function generate() {
+  const pay = $('pay').value;
+  const name = $('emp').value;
+  if (!pay) { setStatus('支払月を選んでください', true); return; }
+  if (!name) { setStatus('社員を選んでください', true); return; }
+
+  setStatus('集計しています…');
+  $('gen').disabled = true;
+
+  const url = GAS_URL + '?report=1&pay=' + encodeURIComponent(pay) +
+              '&name=' + encodeURIComponent(name);
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status !== 'ok') throw new Error(d.message || '集計に失敗しました');
+      render(d);
+      setStatus('');
+      $('print').disabled = false;
+    })
+    .catch(function(err) {
+      setStatus('集計できませんでした：' + err.message, true);
+    })
+    .finally(function() { $('gen').disabled = false; });
+}
+
+function render(d) {
+  $('empName').textContent = d.name;
+  $('period').textContent = '対象期間　' + d.periodLabel;
+  $('payLabel').textContent = d.payLabel;
+
+  const tb = $('rows');
+  tb.innerHTML = '';
+  d.days.forEach(function(day) {
+    const tr = document.createElement('tr');
+    if (day.kubun === '休日出勤') tr.className = 'is-holiday';
+
+    const wdClass = day.wd === '土' ? ' sat' : (day.wd === '日' ? ' sun' : '');
+
+    tr.innerHTML =
+      '<td class="date">' + day.date + '</td>' +
+      '<td class="wd' + wdClass + '">' + day.wd + '</td>' +
+      '<td class="kubun">' + (day.kubun || '') + '</td>' +
+      '<td class="zangyo">' + (day.zangyo === '' ? '' : day.zangyo) + '</td>';
+    tb.appendChild(tr);
+  });
+
+  $('ftZangyo').textContent = fmt(d.total.zangyo);
+  $('cSyukkin').textContent = fmt(d.total.syukkin);
+  $('cKyujitsu').textContent = fmt(d.total.kyujitsu);
+  $('cZangyo').textContent = fmt(d.total.zangyo);
+
+  $('sheet').classList.remove('hidden');
+}
+
+// 0.5刻みを想定：整数はそのまま、小数はそのまま表示
+function fmt(n) {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? String(v) : String(v);
+}
+</script>
+</body>
+</html>
