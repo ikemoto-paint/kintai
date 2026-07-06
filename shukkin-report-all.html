@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出退勤表（全員一覧） | 株式会社イケモト</title>
+<style>
+  :root {
+    --ink: #1a2233;
+    --ink-soft: #4a5568;
+    --line: #d4d9e2;
+    --line-soft: #e8ebf0;
+    --paper: #ffffff;
+    --bg: #eef1f5;
+    --accent: #2d5a7c;
+    --accent-soft: #eaf2f8;
+    --holiday: #b5453a;
+    --holiday-soft: #fbeceb;
+    --sat: #2d5a7c;
+    --sun: #b5453a;
+    --zebra: #f7f9fb;
+    --time: #7a6320;
+    --time-soft: #f4efe0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    padding: 20px;
+  }
+
+  /* ---- 操作パネル（印刷時は非表示） ---- */
+  .controls {
+    max-width: 900px;
+    margin: 0 auto 24px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 20px;
+    align-items: flex-end;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+  .field input, .field select {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    min-width: 160px;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .btn {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { background: #a8b3c1; cursor: not-allowed; }
+  .btn-ghost {
+    background: #fff;
+    color: var(--accent);
+    border: 1px solid var(--line);
+  }
+  .btn-ghost:hover { background: var(--accent-soft); }
+  .btn-ghost:disabled { color: #a8b3c1; cursor: not-allowed; }
+
+  .status {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    text-align: center;
+    min-height: 20px;
+  }
+  .status.error { color: var(--holiday); font-weight: 600; }
+
+  /* ---- 帳票本体 ---- */
+  .sheet {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 30px 34px 36px;
+    box-shadow: 0 1px 3px rgba(26,34,51,0.06);
+  }
+  .sheet.hidden { display: none; }
+
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+  }
+  .sheet-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+  .sheet-company {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.7;
+  }
+  .sheet-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  table.grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 11px;
+  }
+  table.grid thead th {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: 6px 3px;
+    border: 1px solid var(--accent);
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+  }
+  table.grid thead th.h-date { width: 34px; }
+  table.grid thead th.h-wd { width: 26px; }
+  table.grid tbody td {
+    padding: 4px 3px;
+    border: 1px solid var(--line);
+    text-align: center;
+    vertical-align: middle;
+    height: 26px;
+  }
+  table.grid tbody tr:nth-child(even) { background: var(--zebra); }
+
+  td.date { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+  td.wd { font-weight: 600; }
+  td.wd.sat { color: var(--sat); }
+  td.wd.sun { color: var(--sun); }
+
+  /* 各社員セル */
+  td.cell { line-height: 1.25; }
+  td.cell .kb { display: block; }
+  td.cell .tm {
+    display: block;
+    font-size: 9px;
+    color: var(--time);
+    font-variant-numeric: tabular-nums;
+    margin-top: 1px;
+  }
+  /* 週末の行（薄い背景） */
+  tr.wknd-sat td.date, tr.wknd-sat td.wd { color: var(--sat); }
+  tr.wknd-sun td.date, tr.wknd-sun td.wd { color: var(--sun); }
+  /* 休日出勤セル */
+  td.cell.holiday {
+    background: var(--holiday-soft);
+    color: var(--holiday);
+    font-weight: 700;
+  }
+  td.cell.holiday .tm { color: var(--holiday); }
+
+  tfoot td {
+    padding: 6px 3px;
+    border: 1px solid var(--ink);
+    font-weight: 700;
+    background: var(--accent-soft);
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  tfoot td.foot-label {
+    text-align: right;
+    letter-spacing: 0.04em;
+    background: #fff;
+  }
+  tfoot .fv { font-variant-numeric: tabular-nums; }
+
+  /* ---- 凡例 ---- */
+  .legend {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    align-items: center;
+  }
+  .legend .lg-title { font-weight: 700; color: var(--ink); letter-spacing: 0.04em; }
+  .legend .lg-item { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .sw {
+    display: inline-block;
+    width: 13px; height: 13px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .legend .sw.holiday { background: var(--holiday-soft); border-color: var(--holiday); }
+  .legend .tag {
+    display: inline-block;
+    min-width: 18px;
+    padding: 1px 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+    font-weight: 600;
+    text-align: center;
+  }
+  .legend .note { color: var(--time); font-weight: 600; }
+
+  .sheet-foot {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 36px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .sign { text-align: center; }
+  .sign .box {
+    width: 84px; height: 46px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  /* ---- 印刷（A4縦・1枚） ---- */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .controls, .status, .no-print { display: none !important; }
+    .sheet {
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 0;
+      margin: 0;
+    }
+    table.grid thead th,
+    table.grid tbody tr:nth-child(even),
+    td.cell.holiday, tfoot td,
+    tr.wknd-sat, tr.wknd-sun,
+    .legend .sw.holiday {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @page { size: A4 portrait; margin: 10mm; }
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .sheet { padding: 20px 12px 24px; overflow-x: auto; }
+    .field input, .field select { min-width: 0; width: 100%; }
+    .field { flex: 1 1 100%; }
+    table.grid { min-width: 560px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls no-print">
+  <div class="field">
+    <label for="pay">支払月</label>
+    <input type="month" id="pay">
+  </div>
+  <button class="btn btn-primary" id="gen">表示する</button>
+  <button class="btn btn-ghost" id="print" disabled>印刷</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<div class="sheet hidden" id="sheet">
+  <div class="sheet-head">
+    <div class="sheet-title">出退勤表（全員一覧）</div>
+    <div class="sheet-company">
+      株式会社イケモト<br>
+      <span id="payLabel"></span>
+    </div>
+  </div>
+  <div class="sheet-meta">
+    <div id="period"></div>
+    <div id="genDate"></div>
+  </div>
+
+  <table class="grid">
+    <thead id="thead"></thead>
+    <tbody id="rows"></tbody>
+    <tfoot id="tfoot"></tfoot>
+  </table>
+
+  <div class="legend">
+    <span class="lg-title">凡例</span>
+    <span class="lg-item"><span class="tag">出</span> 出勤</span>
+    <span class="lg-item"><span class="tag">有</span> 有給</span>
+    <span class="lg-item"><span class="tag">有前</span> 有給（午前休）</span>
+    <span class="lg-item"><span class="tag">有後</span> 有給（午後休）</span>
+    <span class="lg-item"><span class="tag">欠</span> 欠勤</span>
+    <span class="lg-item"><span class="tag">休</span> 休み</span>
+    <span class="lg-item"><span class="sw holiday"></span> 休日出勤</span>
+    <span class="lg-item"><span class="note">遅30</span>＝遅刻30分／<span class="note">早30</span>＝早退30分／<span class="note">残1.5</span>＝残業1.5h（発生時のみ表示）</span>
+  </div>
+
+  <div class="sheet-foot">
+    <div class="sign">承認<div class="box"></div></div>
+    <div class="sign">作成者<div class="box"></div></div>
+  </div>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxZiF5RJhBjz5pmJ27nFSzGnD0-7vyjuaGbxOMUI0tdssu3v6fHzDOPwn0UezRu90qwQw/exec";
+
+const $ = function(id) { return document.getElementById(id); };
+
+let EMPLOYEES = [];
+
+window.addEventListener('DOMContentLoaded', function() {
+  const now = new Date();
+  $('pay').value = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+  loadEmployees();
+  $('gen').addEventListener('click', generate);
+  $('print').addEventListener('click', function() { window.print(); });
+});
+
+function setStatus(msg, isError) {
+  const el = $('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (isError ? ' error' : '');
+}
+
+function loadEmployees() {
+  setStatus('社員一覧を読み込んでいます…');
+  fetch(GAS_URL)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status !== 'ok') throw new Error(d.message || '取得に失敗しました');
+      EMPLOYEES = (d.employees || []).map(function(e) { return e.name; });
+      if (EMPLOYEES.length === 0) throw new Error('社員が登録されていません');
+      setStatus('');
+    })
+    .catch(function(err) {
+      setStatus('社員一覧を読み込めませんでした：' + err.message, true);
+    });
+}
+
+function generate() {
+  const pay = $('pay').value;
+  if (!pay) { setStatus('支払月を選んでください', true); return; }
+  if (EMPLOYEES.length === 0) { setStatus('社員一覧がまだ読み込めていません。少し待って再度お試しください', true); return; }
+
+  setStatus('全員分を集計しています…（社員数ぶん通信するため数秒かかります）');
+  $('gen').disabled = true;
+  $('print').disabled = true;
+
+  // 社員ごとに既存のreport APIを呼び出す（GASは変更しない）
+  const tasks = EMPLOYEES.map(function(name) {
+    const url = GAS_URL + '?report=1&pay=' + encodeURIComponent(pay) +
+                '&name=' + encodeURIComponent(name);
+    return fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.status !== 'ok') throw new Error(name + '：' + (d.message || '集計に失敗しました'));
+        return d;
+      });
+  });
+
+  Promise.all(tasks)
+    .then(function(results) {
+      render(results);
+      setStatus('');
+      $('print').disabled = false;
+    })
+    .catch(function(err) {
+      setStatus('集計できませんでした：' + err.message, true);
+    })
+    .finally(function() { $('gen').disabled = false; });
+}
+
+// 区分を短い表示タグに変換
+function kubunTag(kubun) {
+  if (!kubun) return '';
+  switch (kubun) {
+    case '出勤': return '出';
+    case '休日出勤': return '休出';
+    case '有給': return '有';
+    case '有給（午前休）': return '有前';
+    case '有給（午後休）': return '有後';
+    case '欠勤': return '欠';
+    case '休み':
+    case '公休':
+    case '休日': return '休';
+    default: return kubun; // 想定外はそのまま表示
+  }
+}
+
+// 時間系（遅刻・早退・残業）を「発生時のみ」小さく併記
+function timeNote(day) {
+  const parts = [];
+  if (num(day.chikoku) > 0) parts.push('遅' + trim(day.chikoku));
+  if (num(day.sotai) > 0) parts.push('早' + trim(day.sotai));
+  if (num(day.zangyo) > 0) parts.push('残' + trim(day.zangyo));
+  return parts.join(' ');
+}
+
+function num(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+function trim(v) { const n = Number(v) || 0; return Number.isInteger(n) ? String(n) : String(n); }
+
+function render(results) {
+  // 表示情報（1人目から期間ラベル等を拝借。全員同一のはず）
+  const base = results[0];
+  $('payLabel').textContent = base.payLabel || '';
+  $('period').textContent = '対象期間　' + (base.periodLabel || '');
+  const now = new Date();
+  $('genDate').textContent = '作成日　' + now.getFullYear() + '年' +
+      (now.getMonth() + 1) + '月' + now.getDate() + '日';
+
+  const names = EMPLOYEES.slice();
+
+  // ---- ヘッダー行 ----
+  const thead = $('thead');
+  let hrow = '<tr><th class="h-date">日</th><th class="h-wd">曜</th>';
+  names.forEach(function(n) { hrow += '<th>' + esc(n) + '</th>'; });
+  hrow += '</tr>';
+  thead.innerHTML = hrow;
+
+  // ---- 本体行（日付ごと） ----
+  // 日付の基準は1人目のdays配列を使う（全員同一の期間）
+  const days = base.days || [];
+  const tb = $('rows');
+  tb.innerHTML = '';
+
+  // 集計用アキュムレータ
+  const totalZangyo = names.map(function() { return 0; });
+  const totalSyukkin = names.map(function() { return 0; });
+
+  days.forEach(function(dayRow, di) {
+    const tr = document.createElement('tr');
+    const wd = dayRow.wd;
+    if (wd === '土') tr.className = 'wknd-sat';
+    else if (wd === '日') tr.className = 'wknd-sun';
+
+    let html =
+      '<td class="date">' + esc(dayRow.date) + '</td>' +
+      '<td class="wd">' + esc(wd) + '</td>';
+
+    names.forEach(function(n, ni) {
+      const d = results[ni];
+      const day = (d.days && d.days[di]) ? d.days[di] : {};
+      const kb = kubunTag(day.kubun);
+      const tm = timeNote(day);
+      const isHoliday = day.kubun === '休日出勤';
+
+      // 集計
+      if (num(day.zangyo) > 0) totalZangyo[ni] += num(day.zangyo);
+      if (day.kubun === '出勤' || day.kubun === '休日出勤') totalSyukkin[ni] += 1;
+
+      html += '<td class="cell' + (isHoliday ? ' holiday' : '') + '">' +
+                (kb ? '<span class="kb">' + esc(kb) + '</span>' : '') +
+                (tm ? '<span class="tm">' + esc(tm) + '</span>' : '') +
+              '</td>';
+    });
+
+    tr.innerHTML = html;
+    tb.appendChild(tr);
+  });
+
+  // ---- フッター（社員ごとの合計）----
+  const tf = $('tfoot');
+  // total は既存APIの d.total を優先。無ければ自前集計を使う。
+  let rowSyu = '<tr><td class="foot-label" colspan="2">出勤日数計</td>';
+  let rowZan = '<tr><td class="foot-label" colspan="2">残業時間計(h)</td>';
+  names.forEach(function(n, ni) {
+    const t = results[ni].total || {};
+    const syu = (t.syukkin != null) ? t.syukkin : totalSyukkin[ni];
+    const zan = (t.zangyo  != null) ? t.zangyo  : totalZangyo[ni];
+    rowSyu += '<td class="fv">' + trim(syu) + '</td>';
+    rowZan += '<td class="fv">' + trim(zan) + '</td>';
+  });
+  rowSyu += '</tr>';
+  rowZan += '</tr>';
+  tf.innerHTML = rowSyu + rowZan;
+
+  $('sheet').classList.remove('hidden');
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>
