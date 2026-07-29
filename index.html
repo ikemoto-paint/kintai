@@ -378,6 +378,29 @@
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+
+    /* --- A4 1枚に収めるための圧縮 --- */
+    .sheet-head { padding-bottom: 6px; margin-bottom: 8px; }
+    .sheet-title { font-size: 15px; }
+    .sheet-company { font-size: 9.5px; line-height: 1.5; }
+    .sheet-meta { font-size: 10px; margin-bottom: 6px; }
+
+    table.grid { font-size: 9.5px; }
+    table.grid thead th { padding: 3px 2px; font-size: 9.5px; line-height: 1.2; }
+    table.grid thead th .th-sub { font-size: 7.5px; }
+    table.grid tbody td { padding: 1px 2px; height: 19px; line-height: 1.15; }
+    td.cell .tm { font-size: 7.5px; margin-top: 0; }
+    td.cell .rg { font-size: 7.5px; }
+
+    tfoot td { padding: 3px 2px; font-size: 9.5px; line-height: 1.2; }
+    tfoot td.foot-label { font-size: 9px; }
+
+    .legend { margin-top: 8px; gap: 2px 10px; font-size: 8.5px; }
+    .legend .sw { width: 9px; height: 9px; }
+    .legend .tag { padding: 0 4px; min-width: 15px; }
+
+    .sheet-foot { margin-top: 10px; gap: 24px; font-size: 9.5px; }
+    .sign .box { width: 64px; height: 32px; }
   }
 </style>
 </head>
@@ -459,7 +482,7 @@
         <span class="lg-item"><span class="tag">休</span> 休み</span>
         <span class="lg-item"><span class="sw holiday"></span> 休日出勤</span>
         <span class="lg-item"><span class="note">遅30</span>＝遅刻0.5h／<span class="note">早30</span>＝早退0.5h／<span class="note">残1.5</span>＝残業1.5h</span>
-        <span class="lg-item">パートは「時刻／勤務時間(h)」を表示（12:00〜13:00をまたぐ日は休憩60分控除済み）</span>
+        <span class="lg-item">パート＝時刻／勤務時間(h)。休憩60分控除済み</span>
       </div>
 
       <div class="sheet-foot">
