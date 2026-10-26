@@ -93,13 +93,16 @@
     padding: 10px 16px 0; max-width: 680px; margin: 0 auto;
   }
   #editBadge { font-size: 12px; font-weight: 700; color: var(--amber); display: none; }
-  #allBtn {
+  .allbtns { display: flex; gap: 8px; margin-left: auto; }
+  #allBtn, #allOffBtn {
     background: #fff; color: var(--navy);
     border: 1.5px solid var(--navy); border-radius: 999px;
     padding: 8px 16px; font-size: 13px; font-weight: 700;
     cursor: pointer; font-family: inherit;
   }
   #allBtn:active { background: var(--navy); color: #fff; }
+  #allOffBtn { color: var(--gray); border-color: var(--gray); }
+  #allOffBtn:active { background: var(--gray); color: #fff; }
 
   /* ===== 社員カード ===== */
   .emp {
@@ -436,7 +439,10 @@
 <section class="view on" id="view-input">
   <div class="statusrow">
     <span id="editBadge">● 登録済みの日です（再送信で上書き訂正）</span>
-    <button id="allBtn">全員「出勤」にする</button>
+    <div class="allbtns">
+      <button id="allBtn">全員「出勤」にする</button>
+      <button id="allOffBtn">全員「公休」にする</button>
+    </div>
   </div>
 
   <div id="errBox">
@@ -593,7 +599,7 @@ const TIME_FIELDS = [
   { key: 'yakan',   label: '夜間時間外' },
 ];
 const PART_DEFAULT_START = '09:00';
-const PART_DEFAULT_END   = '15:00';
+const PART_DEFAULT_END   = '12:00';
 
 // ============================================================
 // 状態
@@ -1430,6 +1436,19 @@ $('allBtn').onclick = () => {
       if (!en.start && !en.end) { en.start = PART_DEFAULT_START; en.end = PART_DEFAULT_END; }
     } else {
       en.kubun = '出勤';
+    }
+  });
+  render(); updateBar();
+};
+$('allOffBtn').onclick = () => {
+  employees.forEach(e => {
+    const en = entries[e.name];
+    if (e.type === 'パート') {
+      en.kubun = '休み';   // パートの区分には「公休」がないため「休み」
+      en.start = ''; en.end = '';
+    } else {
+      en.kubun = '公休';
+      en.chikoku = 0; en.sotai = 0; en.socho = 0; en.yakan = 0;
     }
   });
   render(); updateBar();
